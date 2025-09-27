@@ -1,1 +1,1 @@
-AccountServiceTest,ContactServiceTest
+AccountServiceTest ContactServiceTest
