@@ -39,9 +39,9 @@ jobs:
           echo "${{ secrets.SF_JWT_KEY }}" > server.key
           sf auth:jwt:grant \
             --username ${{ secrets.SF_USERNAME }} \
-            --jwtkeyfile server.key \
-            --clientid ${{ secrets.SF_CONSUMER_KEY }} \
-            --instanceurl https://login.salesforce.com
+            --jwt-key-file server.key \
+            --client-id ${{ secrets.SF_CONSUMER_KEY }} \
+            --instance-url https://login.salesforce.com
         shell: bash
 
       # Step 6: Generate delta package
