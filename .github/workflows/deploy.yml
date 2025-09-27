@@ -78,12 +78,19 @@ jobs:
       # Step 9: Validate Deployment (check only, no commit)
       - name: Validate Deployment
         run: |
+          if [ ! -f delta/package.xml ]; then
+            echo "⚠️ No changes detected, skipping validation."
+            exit 0
+          fi
+
+          echo "✅ Found delta/package.xml, proceeding with validation..."
           sf project deploy start \
             --manifest delta/package.xml \
             --test-level RunSpecifiedTests \
-            --tests "$TEST_CLASSES" \
+            $(echo $TEST_CLASSES | xargs -n1 echo --tests) \
             --dry-run \
             --verbose
+
 
       # Step 10: Deploy to Salesforce (real deploy after validation)
       - name: Deploy to Salesforce
