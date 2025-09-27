@@ -27,7 +27,7 @@ jobs:
 
       # Step 3: Install Salesforce CLI
       - name: Install Salesforce CLI
-        run: npm install --global sfdx-cli
+        run: npm install --global @salesforce/cli
 
       # Step 4: Install sfdx-git-delta
       - name: Install sfdx-git-delta
@@ -37,7 +37,7 @@ jobs:
       - name: Authenticate to Salesforce
         run: |
           echo "${{ secrets.SF_JWT_KEY }}" > server.key
-          sfdx auth:jwt:grant \
+          sf auth:jwt:grant \
             --username ${{ secrets.SF_USERNAME }} \
             --jwtkeyfile server.key \
             --clientid ${{ secrets.SF_CONSUMER_KEY }} \
