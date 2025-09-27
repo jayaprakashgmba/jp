@@ -1,0 +1,73 @@
+name: Salesforce CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Step 2: Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Step 3: Install Salesforce CLI
+      - name: Install Salesforce CLI
+        run: npm install --global sfdx-cli
+
+      # Step 4: Install sfdx-git-delta
+      - name: Install sfdx-git-delta
+        run: echo y | sfdx plugins:install sfdx-git-delta
+
+      # Step 5: Authenticate Salesforce (JWT)
+      - name: Authenticate to Salesforce
+        run: |
+          echo "${{ secrets.SF_JWT_KEY }}" > server.key
+          sfdx auth:jwt:grant \
+            --username ${{ secrets.SF_USERNAME }} \
+            --jwtkeyfile server.key \
+            --clientid ${{ secrets.SF_CONSUMER_KEY }} \
+            --instanceurl https://login.salesforce.com
+        shell: bash
+
+      # Step 6: Generate delta package
+      - name: Generate Delta
+        run: |
+          mkdir delta
+          sfdx sgd:source:delta \
+            --to HEAD \
+            --from HEAD~1 \
+            --output delta
+
+      # Step 7: Read Test Classes (with fallback)
+      - name: Read Test Classes
+        id: testclasses
+        run: |
+          if [ -f test-classes.txt ] && [ -s test-classes.txt ]; then
+            TEST_CLASSES=$(cat test-classes.txt)
+            echo "Using test classes from file: $TEST_CLASSES"
+          else
+            TEST_CLASSES="RunLocalTests"
+            echo "test-classes.txt missing or empty, defaulting to: $TEST_CLASSES"
+          fi
+          echo "TEST_CLASSES=$TEST_CLASSES" >> $GITHUB_ENV
+
+      # Step 8: Validate Deployment
+      - name: Validate Deployment
+        run: |
+          DEPLOY_TAG="validate-$(date +%Y%m%d%H%M%S)"
+          echo "Deployment tag: $DEPLOY_TAG"
