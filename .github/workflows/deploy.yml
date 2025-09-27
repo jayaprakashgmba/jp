@@ -52,13 +52,22 @@ jobs:
             --to HEAD \
             --from HEAD~1 \
             --output-dir delta
+          echo "Delta contents:"
+          ls -R delta
 
-      # Step 7: Read Test Classes (with fallback)
+      # Step 7: Upload delta as artifact (for inspection)
+      - name: Upload Delta Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: delta-package
+          path: delta/
+
+      # Step 8: Read Test Classes (with fallback)
       - name: Read Test Classes
         id: testclasses
         run: |
           if [ -f test-classes.txt ] && [ -s test-classes.txt ]; then
-            TEST_CLASSES=$(cat test-classes.txt)
+            TEST_CLASSES=$(tr '\n' ',' < test-classes.txt | sed 's/,$//')
             echo "Using test classes from file: $TEST_CLASSES"
           else
             TEST_CLASSES="RunLocalTests"
@@ -66,9 +75,22 @@ jobs:
           fi
           echo "TEST_CLASSES=$TEST_CLASSES" >> $GITHUB_ENV
 
-      # Step 8: Validate Deployment
+      # Step 9: Validate Deployment (check only, no commit)
       - name: Validate Deployment
         run: |
-          DEPLOY_TAG="validate-$(date +%Y%m%d%H%M%S)"
-          echo "Deployment tag: $DEPLOY_TAG"
+          sf project deploy start \
+            --manifest delta/package.xml \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES" \
+            --dry-run \
+            --verbose
 
+      # Step 10: Deploy to Salesforce (real deploy after validation)
+      - name: Deploy to Salesforce
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sf project deploy start \
+            --manifest delta/package.xml \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES" \
+            --verbose
