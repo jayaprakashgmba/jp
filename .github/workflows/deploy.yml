@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
 
       # Step 3: Install Salesforce CLI
       - name: Install Salesforce CLI
@@ -72,4 +72,3 @@ jobs:
           DEPLOY_TAG="validate-$(date +%Y%m%d%H%M%S)"
           echo "Deployment tag: $DEPLOY_TAG"
 
-          
