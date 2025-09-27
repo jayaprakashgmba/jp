@@ -51,7 +51,7 @@ jobs:
           sfdx sgd:source:delta \
             --to HEAD \
             --from HEAD~1 \
-            --output delta
+            --output-dir delta
 
       # Step 7: Read Test Classes (with fallback)
       - name: Read Test Classes
