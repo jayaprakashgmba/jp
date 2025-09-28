@@ -1,0 +1,116 @@
+name: Salesforce Multi-Env CI/CD
+
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Salesforce CLI + sfdx-git-delta
+        run: |
+          npm install --global sfdx-cli
+          echo y | sfdx plugins:install sfdx-git-delta
+
+      - name: Authenticate to Dev Org
+        run: |
+          echo "${{ secrets.DEV_JWT_KEY }}" > server.key
+          sfdx auth:jwt:grant \
+            --username ${{ secrets.DEV_USERNAME }} \
+            --jwtkeyfile server.key \
+            --clientid ${{ secrets.DEV_CONSUMER_KEY }} \
+            --instanceurl https://test.salesforce.com
+
+      - name: Generate Delta
+        run: |
+          mkdir delta
+          sfdx sgd:source:delta \
+            --to HEAD \
+            --from origin/main \
+            --output delta
+
+      - name: Deploy to Dev Org (Validation Only)
+        run: |
+          sfdx force:source:deploy \
+            -x delta/package/package.xml \
+            -u ${{ secrets.DEV_USERNAME }} \
+            --checkonly \
+            --testlevel RunLocalTests
+
+      - name: Deploy to Dev Org (Full)
+        run: |
+          sfdx force:source:deploy \
+            -x delta/package/package.xml \
+            -u ${{ secrets.DEV_USERNAME }} \
+            --testlevel RunLocalTests
+
+      - name: Run Apex Tests
+        run: |
+          sfdx force:apex:test:run \
+            --codecoverage \
+            --resultformat human \
+            --outputdir test-results \
+            --wait 10
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: apex-test-results
+          path: test-results/
+
+  promote-to-uat:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: UAT
+      url: https://test.salesforce.com
+    steps:
+      - name: Authenticate to UAT
+        run: |
+          echo "${{ secrets.UAT_JWT_KEY }}" > server.key
+          sfdx auth:jwt:grant \
+            --username ${{ secrets.UAT_USERNAME }} \
+            --jwtkeyfile server.key \
+            --clientid ${{ secrets.UAT_CONSUMER_KEY }} \
+            --instanceurl https://test.salesforce.com
+
+      - name: Deploy to UAT
+        run: |
+          sfdx force:source:deploy \
+            -x delta/package/package.xml \
+            -u ${{ secrets.UAT_USERNAME }} \
+            --testlevel RunLocalTests
+
+  promote-to-prod:
+    needs: promote-to-uat
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://login.salesforce.com
+      # This forces manual approval before prod deploy
+    steps:
+      - name: Authenticate to Prod
+        run: |
+          echo "${{ secrets.PROD_JWT_KEY }}" > server.key
+          sfdx auth:jwt:grant \
+            --username ${{ secrets.PROD_USERNAME }} \
+            --jwtkeyfile server.key \
+            --clientid ${{ secrets.PROD_CONSUMER_KEY }} \
+            --instanceurl https://login.salesforce.com
+
+      - name: Deploy to Prod
+        run: |
+          sfdx force:source:deploy \
+            -x delta/package/package.xml \
+            -u ${{ secrets.PROD_USERNAME }} \
+            --testlevel RunLocalTests
